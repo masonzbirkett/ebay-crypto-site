@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useSearchParams } from 'next/navigation';
 
-const EBAY_APP_ID = 'YOUR_EBAY_APP_ID'; // Replace with your eBay App ID or proxy endpoint
+const EBAY_APP_ID = process.env.NEXT_PUBLIC_EBAY_APP_ID;
 const WALLET_ADDRESS = 'your-crypto-wallet-address';
-const MOCK_PAYMENT_CONFIRMATION_DELAY = 10000; // Simulate confirmation in 10 seconds
+const MOCK_PAYMENT_CONFIRMATION_DELAY = 10000;
 
 export default function EbayCryptoShop() {
   const [query, setQuery] = useState('wireless earbuds');
@@ -13,9 +12,27 @@ export default function EbayCryptoShop() {
   const searchEbay = async () => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/search?q=${encodeURIComponent(query)}`);
+      const response = await fetch(
+        `https://corsproxy.io/?https://svcs.ebay.com/services/search/FindingService/v1`
+        + `?OPERATION-NAME=findItemsByKeywords`
+        + `&SERVICE-VERSION=1.0.0`
+        + `&SECURITY-APPNAME=${EBAY_APP_ID}`
+        + `&RESPONSE-DATA-FORMAT=JSON`
+        + `&REST-PAYLOAD`
+        + `&keywords=${encodeURIComponent(query)}`
+      );
       const data = await response.json();
-      setResults(data);
+      const items = data.findItemsByKeywordsResponse?.[0]?.searchResult?.[0]?.item || [];
+
+      const formatted = items.map((item) => ({
+        title: item.title?.[0],
+        price: item.sellingStatus?.[0]?.currentPrice?.[0]?.__value__,
+        currency: item.sellingStatus?.[0]?.currentPrice?.[0]?.['@currencyId'],
+        image: item.galleryURL?.[0],
+        item_web_url: item.viewItemURL?.[0],
+      }));
+
+      setResults(formatted);
     } catch (error) {
       console.error('Search error:', error);
     }
@@ -28,7 +45,10 @@ export default function EbayCryptoShop() {
 
   return (
     <div className="p-4 max-w-5xl mx-auto">
-      <h1 className="text-3xl font-bold mb-4">Crypto Marketplace (eBay)</h1>
+      <div className="text-center mb-4">
+        <img src="/logo.png" alt="Site Logo" className="mx-auto h-16" />
+      </div>
+      <h1 className="text-3xl font-bold mb-4 text-center">Crypto Marketplace (eBay)</h1>
       <div className="flex gap-2 mb-6">
         <input
           value={query}
@@ -59,47 +79,6 @@ export default function EbayCryptoShop() {
             </a>
           </div>
         ))}
-      </div>
-    </div>
-  );
-}
-
-// Checkout Page Component
-export function CheckoutPage() {
-  const params = useSearchParams();
-  const title = params.get('title');
-  const price = params.get('price');
-  const currency = params.get('currency');
-  const image = params.get('image');
-  const url = params.get('url');
-
-  const [paymentConfirmed, setPaymentConfirmed] = useState(false);
-
-  useEffect(() => {
-    const simulatePayment = setTimeout(() => {
-      setPaymentConfirmed(true);
-    }, MOCK_PAYMENT_CONFIRMATION_DELAY);
-
-    return () => clearTimeout(simulatePayment);
-  }, []);
-
-  return (
-    <div className="p-4 max-w-xl mx-auto">
-      <h1 className="text-2xl font-bold mb-4">Checkout with Crypto</h1>
-      <div className="border rounded-lg shadow p-4">
-        <img src={image} alt={title} className="w-full h-40 object-contain mb-4" />
-        <h2 className="text-lg font-semibold mb-2">{title}</h2>
-        <p className="mb-2">Price: {price} {currency}</p>
-        <p className="mb-4 text-sm text-gray-600">Product Link: <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500 underline">View on eBay</a></p>
-        <div className="bg-gray-100 p-4 rounded-lg text-center">
-          <p className="font-semibold mb-2">Send {price} {currency} to the wallet below:</p>
-          <p className="break-all font-mono text-sm mb-2">{WALLET_ADDRESS}</p>
-          {paymentConfirmed ? (
-            <p className="text-green-600 font-semibold">✅ Payment confirmed. Your order is being processed.</p>
-          ) : (
-            <p className="text-yellow-600 font-medium">⏳ Waiting for payment confirmation...</p>
-          )}
-        </div>
       </div>
     </div>
   );
